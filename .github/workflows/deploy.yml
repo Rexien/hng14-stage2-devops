@@ -1,0 +1,116 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Stage 1 - Lint (Hadolint, flake8, eslint)
+        run: |
+          # Lint Dockerfiles
+          docker run --rm -i hadolint/hadolint < api/Dockerfile
+          docker run --rm -i hadolint/hadolint < worker/Dockerfile
+          docker run --rm -i hadolint/hadolint < frontend/Dockerfile
+          
+          # Lint Python
+          pip install flake8
+          flake8 api/ worker/
+          
+          # Lint Javascript
+          cd frontend
+          npm install eslint -g
+          # Initialize minimal eslint if missing to prevent failing on config
+          [ ! -f .eslintrc.json ] && echo '{"env": {"node": true, "es2021": true}, "extends": "eslint:recommended"}' > .eslintrc.json
+          eslint app.js
+          cd ..
+
+      - name: Stage 2 - Test
+        run: |
+          cd api
+          pip install -r requirements.txt pytest pytest-cov httpx
+          pytest --cov=. --cov-report=xml
+          cd ..
+          
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: api/coverage.xml
+
+      - name: Stage 3 - Build and Push to Local Registry
+        run: |
+          for service in api worker frontend; do
+            IMAGE_SHA=localhost:5000/$service:${{ github.sha }}
+            IMAGE_LATEST=localhost:5000/$service:latest
+            docker build -t $IMAGE_SHA -t $IMAGE_LATEST ./$service
+            docker push $IMAGE_SHA
+            docker push $IMAGE_LATEST
+          done
+
+      - name: Stage 4 - Security Scan (Trivy)
+        run: |
+          for service in api worker frontend; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image \
+            --severity CRITICAL \
+            --exit-code 1 \
+            --format sarif --output trivy-results-$service.sarif \
+            localhost:5000/$service:latest
+          done
+
+      - name: Upload Trivy SARIF Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: trivy-reports
+          path: '*.sarif'
+
+      - name: Stage 5 - Integration Test
+        run: |
+          # Pull from local registry and tag for docker-compose appropriately if needed, 
+          # or just use docker-compose build since it uses the same cache. 
+          # However, replacing compose image values is better.
+          export API_IMAGE=localhost:5000/api:latest
+          export WORKER_IMAGE=localhost:5000/worker:latest
+          export FRONTEND_IMAGE=localhost:5000/frontend:latest
+          
+          # Up the stack
+          docker compose up -d
+          
+          # Install requests
+          pip install requests
+          python scripts/integration_test.py
+          
+      - name: Tear Down Stack
+        if: always()
+        run: docker compose down -v
+          
+      - name: Stage 6 - Deploy (Rolling Update)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Assuming the target server is this runner itself for testing the script behavior
+          docker compose up -d
+          python scripts/deploy.py

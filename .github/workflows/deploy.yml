@@ -41,7 +41,7 @@ jobs:
           
           # Lint Javascript
           cd frontend
-          npm install eslint -g
+          npm install eslint@8 -g
           # Initialize minimal eslint if missing to prevent failing on config
           [ ! -f .eslintrc.json ] && echo '{"env": {"node": true, "es2021": true}, "extends": "eslint:recommended"}' > .eslintrc.json
           eslint app.js

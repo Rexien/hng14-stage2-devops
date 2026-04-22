@@ -11,6 +11,7 @@ redis_password = os.environ.get("REDIS_PASSWORD", None)
 
 r = redis.Redis(host=redis_host, port=redis_port, password=redis_password)
 
+
 @app.post("/jobs")
 def create_job():
     job_id = str(uuid.uuid4())

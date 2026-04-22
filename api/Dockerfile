@@ -9,6 +9,7 @@ RUN useradd -m -r appuser && chown -R appuser /app
 COPY --from=builder /root/.local /home/appuser/.local
 COPY . .
 RUN chown -R appuser /app
+ENV PYTHONUNBUFFERED=1
 USER appuser
 ENV PATH=/home/appuser/.local/bin:$PATH
 EXPOSE 8000

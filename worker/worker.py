@@ -1,13 +1,13 @@
 import redis
 import time
 import os
-import signal
 
 redis_host = os.environ.get("REDIS_HOST", "localhost")
 redis_port = int(os.environ.get("REDIS_PORT", 6379))
 redis_password = os.environ.get("REDIS_PASSWORD", None)
 
 r = redis.Redis(host=redis_host, port=redis_port, password=redis_password)
+
 
 def process_job(job_id):
     print(f"Processing job {job_id}")

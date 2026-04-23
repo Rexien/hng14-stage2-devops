@@ -98,7 +98,7 @@ jobs:
           export FRONTEND_IMAGE=localhost:5000/frontend:latest
           
           # Up the stack
-          docker compose up -d
+          docker compose up -d --wait
           
           # Install requests
           pip install requests

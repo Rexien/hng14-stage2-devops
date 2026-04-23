@@ -21,7 +21,7 @@ services:
     build:
       context: ./api
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8000-8001}:8000"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379

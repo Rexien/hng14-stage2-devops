@@ -1,11 +1,11 @@
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 FROM python:3.12-slim
 WORKDIR /app
-RUN useradd -m -r appuser && chown -R appuser /app
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser && chown -R appuser:appgroup /app
 COPY --from=builder /root/.local /home/appuser/.local
 COPY . .
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*

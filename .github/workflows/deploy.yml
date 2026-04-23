@@ -65,7 +65,7 @@ jobs:
           for service in api worker frontend; do
             IMAGE_SHA=localhost:5000/$service:${{ github.sha }}
             IMAGE_LATEST=localhost:5000/$service:latest
-            docker build -t $IMAGE_SHA -t $IMAGE_LATEST ./$service
+            docker build --cache-from $IMAGE_LATEST -t $IMAGE_SHA -t $IMAGE_LATEST ./$service
             docker push $IMAGE_SHA
             docker push $IMAGE_LATEST
           done
@@ -100,9 +100,11 @@ jobs:
           # Up the stack
           docker compose up -d --wait
           
-          # Install requests
-          pip install requests
-          python scripts/integration_test.py
+          # Install jq for the bash script parsing
+          sudo apt-get install -y jq
+          
+          # Run bash integration script
+          bash scripts/integration.sh
           
       - name: Tear Down Stack
         if: always()
